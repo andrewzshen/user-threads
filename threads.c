@@ -1,4 +1,3 @@
-#include <pthread.h>
 #include <stdlib.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -201,16 +200,11 @@ void pthread_exit(void *value_ptr) {
     tcb_t *tcb = &thread_table[curr_thread];
     tcb->state = THREAD_EXITED;
     
-    int no_threads_left = 1;
     for (size_t i = 0; i < MAX_THREADS; i++) {
         if (thread_table[i].state != THREAD_EXITED) {
-            no_threads_left = 0;
+            schedule_threads();
             break;
         }
-    }
-
-    if (no_threads_left) {
-        schedule_threads();
     }
     
     exit(0);
