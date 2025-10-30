@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdlib.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -79,14 +80,13 @@ static void init_threads() {
         thread_table[i].arg = NULL;
     }
     
-    thread_table[0].thread_id = 0;
-    thread_table[0].state = THREAD_RUNNING;
-    thread_table[0].stack = NULL;
-    thread_table[0].start_routine = NULL;
-    thread_table[0].arg = NULL;
-    
     curr_thread = 0;
-    
+    thread_table[curr_thread].thread_id = 0;
+    thread_table[curr_thread].state = THREAD_RUNNING;    
+    thread_table[curr_thread].stack = NULL;
+    thread_table[curr_thread].start_routine = NULL;
+    thread_table[curr_thread].arg = NULL;
+
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigalrm_handler;
@@ -126,7 +126,7 @@ static void schedule_threads() {
     int next_thread = -1;
     int search_start = (curr_thread + 1) % MAX_THREADS;
     
-    for (size_t i = 0; i < MAX_THREADS; i++) {
+    for (int i = 0; i < MAX_THREADS; i++) {
         int index = (search_start + i) % MAX_THREADS;
         if (thread_table[index].state == THREAD_READY) {
             next_thread = index;
@@ -192,7 +192,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
     stack_address &= ~0xFUL;
     jb[JB_RSP] = i64_ptr_mangle(stack_address);
     
-    thread = &tcb->thread_id;
+    *thread = tcb->thread_id;
     
     return 0;
 }
@@ -201,11 +201,16 @@ void pthread_exit(void *value_ptr) {
     tcb_t *tcb = &thread_table[curr_thread];
     tcb->state = THREAD_EXITED;
     
+    int no_threads_left = 1;
     for (size_t i = 0; i < MAX_THREADS; i++) {
         if (thread_table[i].state != THREAD_EXITED) {
-            schedule_threads();
-            return;
+            no_threads_left = 0;
+            break;
         }
+    }
+
+    if (no_threads_left) {
+        schedule_threads();
     }
     
     exit(0);
